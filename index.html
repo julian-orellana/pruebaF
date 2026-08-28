@@ -250,6 +250,7 @@
             transition: all 0.3s ease;
             font-size: 15px;
             font-weight: 500;
+            user-select: none;
         }
 
         .time-slot:hover:not(.disabled) {
@@ -685,11 +686,14 @@
                     hideError('fecha');
                 }
 
-                if (!selectedTime) {
+                // CORRECCIÓN: Obtener el horario seleccionado directamente del DOM
+                const selectedSlot = document.querySelector('.time-slot.selected');
+                if (!selectedSlot) {
                     showError('horario');
                     isValid = false;
                 } else {
                     hideError('horario');
+                    selectedTime = selectedSlot.textContent.trim();
                 }
             }
 
@@ -697,13 +701,17 @@
         }
 
         function showError(field) {
-            document.getElementById(`error-${field}`).classList.add('show');
-            document.getElementById(field).classList.add('error');
+            const errorEl = document.getElementById(`error-${field}`);
+            const inputEl = document.getElementById(field);
+            if (errorEl) errorEl.classList.add('show');
+            if (inputEl) inputEl.classList.add('error');
         }
 
         function hideError(field) {
-            document.getElementById(`error-${field}`).classList.remove('show');
-            document.getElementById(field).classList.remove('error');
+            const errorEl = document.getElementById(`error-${field}`);
+            const inputEl = document.getElementById(field);
+            if (errorEl) errorEl.classList.remove('show');
+            if (inputEl) inputEl.classList.remove('error');
         }
 
         function handleServicioChange() {
@@ -732,6 +740,9 @@
             horariosContainer.style.display = 'block';
             loading.style.display = 'block';
             timeSlots.style.display = 'none';
+            
+            // Resetear selección previa
+            selectedTime = '';
 
             // Simular carga
             setTimeout(() => {
@@ -740,28 +751,29 @@
                 
                 // Generar horarios aleatorios
                 const allSlots = ['09:00', '10:30', '12:00', '14:30', '16:00', '17:30'];
-                const disabledSlots = Math.floor(Math.random() * 3);
                 
-                timeSlots.innerHTML = allSlots.map(slot => {
+                timeSlots.innerHTML = '';
+                allSlots.forEach(slot => {
                     const isDisabled = Math.random() < 0.3;
-                    return `<div class="time-slot ${isDisabled ? 'disabled' : ''}" 
-                                 onclick="${isDisabled ? '' : `selectTime('${slot}', this)`}">
-                                ${slot}
-                            </div>`;
-                }).join('');
+                    const slotDiv = document.createElement('div');
+                    slotDiv.className = `time-slot ${isDisabled ? 'disabled' : ''}`;
+                    slotDiv.textContent = slot;
+                    
+                    if (!isDisabled) {
+                        slotDiv.addEventListener('click', function() {
+                            // Remover selección previa
+                            document.querySelectorAll('.time-slot').forEach(s => s.classList.remove('selected'));
+                            // Seleccionar este
+                            this.classList.add('selected');
+                            selectedTime = slot;
+                            hideError('horario');
+                            console.log('Horario seleccionado:', selectedTime);
+                        });
+                    }
+                    
+                    timeSlots.appendChild(slotDiv);
+                });
             }, 1000);
-        }
-
-        function selectTime(time, element) {
-            if (element.classList.contains('disabled')) return;
-            
-            document.querySelectorAll('.time-slot').forEach(slot => {
-                slot.classList.remove('selected');
-            });
-            
-            element.classList.add('selected');
-            selectedTime = time;
-            hideError('horario');
         }
 
         function showSummary() {
@@ -774,11 +786,13 @@
 
             // Ajustar servicio de ortodoncia
             if (servicio === 'Ortodoncia') {
-                const ortodoncia = document.querySelector('input[name="ortodoncia"]:checked').value;
-                servicio = ortodoncia === 'Sí' ? 'Consulta inicial de ortodoncia' : 'Mantenimiento de ortodoncia';
+                const ortodoncia = document.querySelector('input[name="ortodoncia"]:checked');
+                if (ortodoncia) {
+                    servicio = ortodoncia.value === 'Sí' ? 'Consulta inicial de ortodoncia' : 'Mantenimiento de ortodoncia';
+                }
             }
 
-            const fechaFormateada = new Date(fecha).toLocaleDateString('es-ES', {
+            const fechaFormateada = new Date(fecha + 'T12:00:00').toLocaleDateString('es-ES', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
@@ -815,15 +829,12 @@
         }
 
         function confirmAppointment() {
-            // Generar número de cita aleatorio
             const appointmentNumber = 'CD-' + Date.now().toString().slice(-8);
             document.getElementById('appointment-number').textContent = `Cita #${appointmentNumber}`;
 
-            // Ocultar paso 4 y mostrar éxito
             document.getElementById('step4').classList.remove('active');
             document.getElementById('success').classList.add('active');
             
-            // Actualizar barra de progreso
             document.querySelectorAll('.progress-step').forEach(el => {
                 el.classList.remove('active');
                 el.classList.add('completed');
@@ -831,7 +842,6 @@
         }
 
         function resetForm() {
-            // Resetear todos los campos
             document.getElementById('nombre').value = '';
             document.getElementById('apellido').value = '';
             document.getElementById('telefono').value = '';
@@ -841,24 +851,20 @@
             document.getElementById('doctor').value = '';
             document.querySelectorAll('input[name="ortodoncia"]').forEach(radio => radio.checked = false);
             
-            // Resetear UI
             document.getElementById('ortodoncia-question').style.display = 'none';
             document.getElementById('horarios-container').style.display = 'none';
             document.getElementById('time-slots').innerHTML = '';
             selectedTime = '';
 
-            // Volver al paso 1
             document.getElementById('success').classList.remove('active');
             document.getElementById('step1').classList.add('active');
             updateProgressBar(1);
             currentStep = 1;
 
-            // Limpiar errores
             document.querySelectorAll('.error').forEach(el => el.classList.remove('show'));
             document.querySelectorAll('input, textarea, select').forEach(el => el.classList.remove('error'));
         }
 
-        // Establecer fecha mínima como hoy
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('fecha').setAttribute('min', today);
